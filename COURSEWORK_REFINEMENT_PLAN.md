@@ -1,5 +1,14 @@
 # Coursework Detailed Plan (Refinement Track)
 
+## Implementation Status (Repo)
+
+- [x] Phase A baseline refactor
+- [x] Phase B ACE-Step integration (`repaint`) + fallback
+- [ ] Phase C plugin config system (`plugins.yaml`)
+- [ ] Phase D additional interactive controls polish
+- [ ] Phase E evaluation report artifacts
+- [ ] Phase F final packaging
+
 ## 1. Project Positioning
 
 **Track**: Refinement Demo (single base model + capability switching)

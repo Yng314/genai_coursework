@@ -1,0 +1,15 @@
+Initial_Research/demix
+Initial_Research/spec
+__pycache__
+Utils/pretrained_models
+
+# Large / copyrighted audio should not be committed to a public Space repo
+Songs/
+Test_songs/
+Initial_Research/*.mp3
+Initial_Research/*.wav
+mixed_song.wav
+final_mix.mp3
+.acestep_runtime/
+checkpoints/
+outputs/
