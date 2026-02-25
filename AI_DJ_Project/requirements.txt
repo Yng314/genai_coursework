@@ -7,6 +7,8 @@ librosa
 soundfile
 numpy
 scipy
+# Demucs enables stem-aware cue selection and transition refinement.
+demucs
 
 # Optional ACE-Step backend (heavy; keep optional so MusicGen path still works):
 # git+https://github.com/ACE-Step/ACE-Step-1.5.git

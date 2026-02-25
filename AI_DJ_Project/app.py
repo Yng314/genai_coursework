@@ -19,6 +19,8 @@ LOGGER = logging.getLogger(__name__)
 def _to_optional_float(value) -> Optional[float]:
     if value is None:
         return None
+    if isinstance(value, str) and not value.strip():
+        return None
     try:
         return float(value)
     except Exception:
@@ -30,8 +32,8 @@ def _run_transition(
     song_b,
     plugin_id,
     instruction_text,
+    transition_bars,
     pre_context_sec,
-    repaint_width_sec,
     post_context_sec,
     analysis_sec,
     bpm_target,
@@ -41,7 +43,6 @@ def _run_transition(
     cue_a_sec,
     cue_b_sec,
     output_dir,
-    force_fallback,
 ):
     if not song_a or not song_b:
         raise gr.Error("Please upload both Song A and Song B.")
@@ -51,8 +52,10 @@ def _run_transition(
         song_b_path=song_b,
         plugin_id=plugin_id,
         instruction_text=instruction_text or "",
+        transition_base_mode="B-base-fixed",
+        transition_bars=int(transition_bars),
         pre_context_sec=float(pre_context_sec),
-        repaint_width_sec=float(repaint_width_sec),
+        repaint_width_sec=4.0,
         post_context_sec=float(post_context_sec),
         analysis_sec=float(analysis_sec),
         bpm_target=_to_optional_float(bpm_target),
@@ -62,7 +65,6 @@ def _run_transition(
         inference_steps=int(inference_steps),
         seed=int(seed),
         output_dir=(output_dir or "outputs").strip(),
-        force_fallback_crossfade=bool(force_fallback),
     )
 
     try:
@@ -70,10 +72,7 @@ def _run_transition(
     except Exception as exc:
         raise gr.Error(str(exc))
 
-    status = (
-        f"Backend used: {result.backend_used} | "
-        f"Fallback: {result.used_fallback}"
-    )
+    status = f"Backend used: {result.backend_used}"
     return result.transition_path, result.stitched_path, result.details, status
 
 
@@ -85,8 +84,7 @@ def build_ui() -> gr.Blocks:
 
 This app follows the coursework refinement plan through **Phase B**:
 - deterministic transition API (two songs in -> transition + stitched artifacts out)
-- ACE-Step repaint seam generation
-- automatic fallback to deterministic crossfade when ACE-Step fails
+- ACE-Step repaint seam generation with bar-defined transition periods
             """.strip()
         )
 
@@ -113,6 +111,12 @@ This app follows the coursework refinement plan through **Phase B**:
                     placeholder="e.g., smooth, rising energy, no vocals",
                     lines=2,
                 )
+                transition_bars = gr.Dropdown(
+                    label="Transition period length (bars)",
+                    choices=[4, 8, 16],
+                    value=8,
+                    info="Controls transition duration. Pipeline uses fixed B-base strategy with A as reference.",
+                )
 
             with gr.Column():
                 pre_context_sec = gr.Slider(
@@ -121,13 +125,6 @@ This app follows the coursework refinement plan through **Phase B**:
                     value=6,
                     step=0.5,
                     label="Seconds before seam (Song A context)",
-                )
-                repaint_width_sec = gr.Slider(
-                    minimum=1,
-                    maximum=12,
-                    value=4,
-                    step=0.5,
-                    label="Repaint seam width (seconds)",
                 )
                 post_context_sec = gr.Slider(
                     minimum=1,
@@ -161,14 +158,18 @@ This app follows the coursework refinement plan through **Phase B**:
                 )
                 seed = gr.Number(label="Seed", value=42, precision=0)
 
-                cue_a_sec = gr.Number(label="Optional cue A override (sec)", value=None)
-                cue_b_sec = gr.Number(label="Optional cue B override (sec)", value=None)
+                cue_a_sec = gr.Textbox(
+                    label="Optional cue A override (sec)",
+                    value="",
+                    placeholder="Leave blank for auto cue selection",
+                )
+                cue_b_sec = gr.Textbox(
+                    label="Optional cue B override (sec)",
+                    value="",
+                    placeholder="Leave blank for auto cue selection",
+                )
 
                 output_dir = gr.Textbox(label="Output directory", value="outputs")
-                force_fallback = gr.Checkbox(
-                    label="Force deterministic crossfade fallback (debug)",
-                    value=False,
-                )
 
         run_btn = gr.Button("Generate transition artifacts", variant="primary")
 
@@ -192,8 +193,8 @@ This app follows the coursework refinement plan through **Phase B**:
                 song_b,
                 plugin_id,
                 instruction_text,
+                transition_bars,
                 pre_context_sec,
-                repaint_width_sec,
                 post_context_sec,
                 analysis_sec,
                 bpm_target,
@@ -203,7 +204,6 @@ This app follows the coursework refinement plan through **Phase B**:
                 cue_a_sec,
                 cue_b_sec,
                 output_dir,
-                force_fallback,
             ],
             outputs=[transition_audio, stitched_audio, details, status],
         )

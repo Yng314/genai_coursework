@@ -8,10 +8,9 @@ This repo now includes a **Hugging Face Spaces** demo in `app.py`:
 - Pick a transition style plugin + text instruction.
 - Build a rough seam (`A_tail + B_head`) with BPM-aware stretching.
 - Run **ACE-Step repaint** on the seam window.
-- If ACE-Step fails, fallback to deterministic crossfade.
 - Output two artifacts:
   - transition-only clip
-  - stitched clip (`A context + transition + B context`)
+  - stitched clip (`Song A up to cue + transition + Song B continuation`, seam is replaced not inserted)
 
 ### Deterministic transition API (Phase A)
 
@@ -44,23 +43,27 @@ Create a new Space with:
 Upload these files from this folder:
 - `app.py`
 - `requirements.txt`
-- `packages.txt` (installs `ffmpeg` for MP3 decoding)
+- `packages.txt` (installs `ffmpeg` + `libsndfile1` for audio decoding/runtime)
 
 Important: **Do not upload copyrighted songs** into the Space repo. The demo is designed for **user uploads**.
 
-### Optional: Enable ACE-Step backend
+### Repo hygiene
 
-`ACE-Step` is not required for basic usage. To enable it:
+- The coursework spec notebook at repo root is intentionally git-ignored:
+  `(0) 70113_Generative_AI_README_for_Coursework.ipynb`
+
+### ACE-Step backend (required)
+
+This coursework pipeline uses ACE-Step as the generation method.
 
 ```shell
 pip install git+https://github.com/ACE-Step/ACE-Step-1.5.git
 ```
 
-Then run with optional env vars:
+Then run with environment vars as needed:
 
 ```shell
-export AI_DJ_DEFAULT_BACKEND=acestep
-export AI_DJ_ACESTEP_MODEL_CONFIG=acestep-v15-base
+export AI_DJ_ACESTEP_MODEL_CONFIG=acestep-v15-turbo
 # optional persistent root for checkpoints:
 export AI_DJ_ACESTEP_PROJECT_ROOT=/data/acestep_runtime
 ```
@@ -68,46 +71,30 @@ export AI_DJ_ACESTEP_PROJECT_ROOT=/data/acestep_runtime
 Notes:
 - ACE-Step currently targets Python 3.11.
 - ACE-Step first run can take time due to checkpoint download.
-- Crossfade fallback is automatically used when ACE-Step repaint fails.
 
-## Downloading Allin1 (legacy / local experiments)
- 
-[https://github.com/mir-aidj/all-in-one?tab=readme-ov-file#usage-for-python](https://github.com/mir-aidj/all-in-one?tab=readme-ov-file#usage-for-python)
+### Optional: Demucs stem-aware cue scoring
 
-### 1. Install PyTorch
+Cuepoint scoring can optionally run Demucs on the **analysis windows only** (A tail window + B head window), derive stem-aware mixability signals (`vocals`, `drums`, `bass`, accompaniment density), and penalize overlap risk (vocal-vocal and bass-bass clashes).
 
-Visit [PyTorch](https://pytorch.org/) and install the appropriate version for your system.
+Transition generation can also use Demucs for:
+- drum-led phase locking,
+- one-bassline handoff shaping in `src_audio`,
+- accompaniment-only `reference_audio`,
+- post-repaint stem correction near transition boundaries.
 
-### 2. Install NATTEN (Required for Linux and Windows; macOS will auto-install)
-
-* **Linux**: Download from [NATTEN website](https://www.shi-labs.com/natten/)
-* **macOS**: Auto-installs with `allin1`.
-* **Windows**: Build from source:
-  
-```shell
-pip install ninja # Recommended, not required
-git clone https://github.com/SHI-Labs/NATTEN
-cd NATTEN
-make
-```
-
-### 3. Install the package
+Environment toggles:
 
 ```shell
-pip install git+https://github.com/CPJKU/madmom  # install the latest madmom directly from GitHub
-pip install allin1  # install this package
-```
+# disable Demucs analysis entirely
+export AI_DJ_ENABLE_DEMUCS_ANALYSIS=0
 
-### 4. (Optional) Install FFmpeg for MP3 support
+# disable Demucs transition refinements entirely
+export AI_DJ_ENABLE_DEMUCS_TRANSITION=0
 
-For ubuntu:
+# choose analysis device when enabled (default: cuda if available)
+export AI_DJ_DEMUCS_DEVICE=cpu
 
-```shell
-sudo apt install ffmpeg
-```
-
-For macOS:
-
-```shell
-brew install ffmpeg
+# choose reference period type passed into ACE-Step reference_audio
+# values: accompaniment-only (default) | full-period-a
+export AI_DJ_REFERENCE_AUDIO_MODE=accompaniment-only
 ```

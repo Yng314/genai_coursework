@@ -61,6 +61,8 @@ def decode_segment(path: str, start_sec: float, duration_sec: float, sr: int, ma
                 "-hide_banner",
                 "-loglevel",
                 "error",
+                "-nostdin",
+                "-y",
                 "-ss",
                 str(start_sec),
                 "-t",
