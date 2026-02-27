@@ -15,6 +15,14 @@ logging.basicConfig(
 )
 LOGGER = logging.getLogger(__name__)
 
+LORA_DROPDOWN_CHOICES = [
+    "None",
+    "Chinese New Year (official)",
+]
+LORA_REPO_MAP = {
+    "Chinese New Year (official)": "ACE-Step/ACE-Step-v1.5-chinese-new-year-LoRA",
+}
+
 APP_CSS = """
 .adv-item label,
 .adv-item .gr-block-label,
@@ -64,6 +72,8 @@ def _run_transition(
     seed,
     cue_a_sec,
     cue_b_sec,
+    lora_choice,
+    lora_scale,
     output_dir,
 ):
     if not song_a or not song_b:
@@ -86,6 +96,8 @@ def _run_transition(
         creativity_strength=float(creativity_strength),
         inference_steps=int(inference_steps),
         seed=int(seed),
+        acestep_lora_path=LORA_REPO_MAP.get(str(lora_choice), ""),
+        acestep_lora_scale=float(lora_scale),
         output_dir=(output_dir or "outputs").strip(),
     )
 
@@ -150,22 +162,39 @@ def build_ui() -> gr.Blocks:
             )
 
         with gr.Row():
-            plugin_id = gr.Dropdown(
-                label="Transition style plugin",
-                choices=list(PLUGIN_PRESETS.keys()),
-                value="Smooth Blend",
-            )
-            instruction_text = gr.Textbox(
-                label="Text instruction",
-                placeholder="e.g., smooth, rising energy, no vocals",
-                lines=2,
-            )
-            transition_bars = gr.Dropdown(
-                label="Transition period length (bars)",
-                choices=[4, 8, 16],
-                value=8,
-                info="Controls transition duration. Pipeline uses fixed B-base strategy with A as reference.",
-            )
+            with gr.Column():
+                plugin_id = gr.Dropdown(
+                    label="Transition style plugin",
+                    choices=list(PLUGIN_PRESETS.keys()),
+                    value="Smooth Blend",
+                )
+            with gr.Column():
+                lora_choice = gr.Dropdown(
+                    label="LoRA adapter",
+                    choices=LORA_DROPDOWN_CHOICES,
+                    value="None",
+                    info="Select an ACE-Step LoRA adapter to apply during repaint.",
+                )
+                lora_scale = gr.Slider(
+                    minimum=0.0,
+                    maximum=2.0,
+                    value=0.8,
+                    step=0.05,
+                    label="LoRA scale",
+                )
+            with gr.Column():
+                instruction_text = gr.Textbox(
+                    label="Text instruction",
+                    placeholder="e.g., smooth, rising energy, no vocals",
+                    lines=2,
+                )
+            with gr.Column():
+                transition_bars = gr.Dropdown(
+                    label="Transition period length (bars)",
+                    choices=[4, 8, 16],
+                    value=8,
+                    info="Controls transition duration. Pipeline uses fixed B-base strategy with A as reference.",
+                )
 
         with gr.Accordion("Advanced controls", open=False):
             with gr.Row():
@@ -293,6 +322,8 @@ def build_ui() -> gr.Blocks:
                 seed,
                 cue_a_sec,
                 cue_b_sec,
+                lora_choice,
+                lora_scale,
                 output_dir,
             ],
             outputs=[transition_audio, hard_splice_audio, rough_stitched_audio, stitched_audio],

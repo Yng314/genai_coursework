@@ -96,6 +96,8 @@ class TransitionRequest:
     acestep_offload_to_cpu: bool = False
     acestep_offload_dit_to_cpu: bool = False
     acestep_use_mlx_dit: bool = True
+    acestep_lora_path: str = os.getenv("AI_DJ_ACESTEP_LORA_PATH", "").strip()
+    acestep_lora_scale: float = float(os.getenv("AI_DJ_ACESTEP_LORA_SCALE", "1.0").strip() or "1.0")
 
     def to_log_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -178,6 +180,34 @@ def _resolve_acestep_project_root(request: TransitionRequest) -> str:
     root = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".acestep_runtime")
     os.makedirs(root, exist_ok=True)
     return root
+
+
+def _resolve_lora_path(lora_spec: str, project_root: str) -> str:
+    spec = (lora_spec or "").strip()
+    if not spec:
+        return ""
+    if os.path.exists(spec):
+        return os.path.abspath(spec)
+    # Treat non-local spec as a Hugging Face repo id, e.g. ACE-Step/ACE-Step-v1.5-chinese-new-year-LoRA
+    if "/" not in spec:
+        raise RuntimeError(
+            f"LoRA path not found: {spec}. Provide a local path or a Hugging Face repo id like "
+            "ACE-Step/ACE-Step-v1.5-chinese-new-year-LoRA."
+        )
+    try:
+        from huggingface_hub import snapshot_download
+    except Exception as exc:
+        raise RuntimeError(
+            "huggingface_hub is required to download LoRA from repo id. Install with: pip install huggingface_hub"
+        ) from exc
+
+    local_dir = os.path.join(project_root, "lora_cache", _slug(spec))
+    os.makedirs(local_dir, exist_ok=True)
+    return snapshot_download(
+        repo_id=spec,
+        local_dir=local_dir,
+        local_dir_use_symlinks=False,
+    )
 
 
 def _build_caption(plugin_id: str, instruction_text: str) -> str:
@@ -1292,7 +1322,13 @@ def _load_acestep_runtime(request: TransitionRequest) -> Dict[str, Any]:
     global _ACESTEP_RUNTIME
 
     project_root = _resolve_acestep_project_root(request)
-    runtime_key = (project_root, request.acestep_model_config, request.acestep_device)
+    runtime_key = (
+        project_root,
+        request.acestep_model_config,
+        request.acestep_device,
+        request.acestep_lora_path,
+        float(request.acestep_lora_scale),
+    )
 
     if _ACESTEP_RUNTIME is not None and _ACESTEP_RUNTIME.get("key") == runtime_key:
         return _ACESTEP_RUNTIME
@@ -1322,6 +1358,26 @@ def _load_acestep_runtime(request: TransitionRequest) -> Dict[str, Any]:
     if not ok:
         raise RuntimeError(f"ACE-Step initialize_service failed: {status}")
 
+    lora_debug: Dict[str, Any] = {"requested": False}
+    if request.acestep_lora_path:
+        lora_debug["requested"] = True
+        resolved_lora_path = _resolve_lora_path(request.acestep_lora_path, project_root)
+        try:
+            handler.load_lora(resolved_lora_path)
+            handler.set_use_lora(True)
+            handler.set_lora_scale(float(request.acestep_lora_scale))
+            lora_debug.update(
+                {
+                    "loaded": True,
+                    "path": resolved_lora_path,
+                    "scale": float(request.acestep_lora_scale),
+                }
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load ACE-Step LoRA: {exc}") from exc
+    else:
+        lora_debug["loaded"] = False
+
     _ACESTEP_RUNTIME = {
         "key": runtime_key,
         "project_root": project_root,
@@ -1329,6 +1385,7 @@ def _load_acestep_runtime(request: TransitionRequest) -> Dict[str, Any]:
         "GenerationParams": GenerationParams,
         "GenerationConfig": GenerationConfig,
         "generate_music": generate_music,
+        "lora_debug": lora_debug,
     }
     return _ACESTEP_RUNTIME
 
@@ -1505,6 +1562,7 @@ def generate_transition_artifacts(request: TransitionRequest) -> TransitionResul
     details = {
         "backend_used": backend_used,
         "generation_args": request.to_log_dict(),
+        "lora": _load_acestep_runtime(request).get("lora_debug", {"requested": False}),
         "bpm": {
             "song_a": round(float(rough["bpm_a"]), 3),
             "song_b": round(float(rough["bpm_b"]), 3),
