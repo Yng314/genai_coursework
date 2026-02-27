@@ -72,8 +72,12 @@ def _run_transition(
     except Exception as exc:
         raise gr.Error(str(exc))
 
-    status = f"Backend used: {result.backend_used}"
-    return result.transition_path, result.stitched_path, result.details, status
+    return (
+        result.transition_path,
+        result.rough_stitched_path,
+        result.hard_splice_path,
+        result.stitched_path,
+    )
 
 
 def build_ui() -> gr.Blocks:
@@ -89,36 +93,37 @@ This app follows the coursework refinement plan through **Phase B**:
         )
 
         with gr.Row():
-            with gr.Column():
-                song_a = gr.Audio(
-                    label="Song A (mix out)",
-                    type="filepath",
-                    sources=["upload"],
-                )
-                song_b = gr.Audio(
-                    label="Song B (mix in)",
-                    type="filepath",
-                    sources=["upload"],
-                )
+            song_a = gr.Audio(
+                label="Song A (mix out)",
+                type="filepath",
+                sources=["upload"],
+            )
+            song_b = gr.Audio(
+                label="Song B (mix in)",
+                type="filepath",
+                sources=["upload"],
+            )
 
-                plugin_id = gr.Dropdown(
-                    label="Transition style plugin",
-                    choices=list(PLUGIN_PRESETS.keys()),
-                    value="Smooth Blend",
-                )
-                instruction_text = gr.Textbox(
-                    label="Text instruction",
-                    placeholder="e.g., smooth, rising energy, no vocals",
-                    lines=2,
-                )
-                transition_bars = gr.Dropdown(
-                    label="Transition period length (bars)",
-                    choices=[4, 8, 16],
-                    value=8,
-                    info="Controls transition duration. Pipeline uses fixed B-base strategy with A as reference.",
-                )
+        with gr.Row():
+            plugin_id = gr.Dropdown(
+                label="Transition style plugin",
+                choices=list(PLUGIN_PRESETS.keys()),
+                value="Smooth Blend",
+            )
+            instruction_text = gr.Textbox(
+                label="Text instruction",
+                placeholder="e.g., smooth, rising energy, no vocals",
+                lines=2,
+            )
+            transition_bars = gr.Dropdown(
+                label="Transition period length (bars)",
+                choices=[4, 8, 16],
+                value=8,
+                info="Controls transition duration. Pipeline uses fixed B-base strategy with A as reference.",
+            )
 
-            with gr.Column():
+        with gr.Accordion("Advanced controls", open=False):
+            with gr.Row():
                 pre_context_sec = gr.Slider(
                     minimum=1,
                     maximum=12,
@@ -141,6 +146,7 @@ This app follows the coursework refinement plan through **Phase B**:
                     label="Analysis window (seconds)",
                 )
 
+            with gr.Row():
                 bpm_target = gr.Number(label="Optional BPM target override", value=None)
                 creativity_strength = gr.Slider(
                     minimum=1.0,
@@ -158,6 +164,7 @@ This app follows the coursework refinement plan through **Phase B**:
                 )
                 seed = gr.Number(label="Seed", value=42, precision=0)
 
+            with gr.Row():
                 cue_a_sec = gr.Textbox(
                     label="Optional cue A override (sec)",
                     value="",
@@ -168,7 +175,6 @@ This app follows the coursework refinement plan through **Phase B**:
                     value="",
                     placeholder="Leave blank for auto cue selection",
                 )
-
                 output_dir = gr.Textbox(label="Output directory", value="outputs")
 
         run_btn = gr.Button("Generate transition artifacts", variant="primary")
@@ -178,13 +184,18 @@ This app follows the coursework refinement plan through **Phase B**:
                 label="Generated transition clip",
                 type="filepath",
             )
+            rough_stitched_audio = gr.Audio(
+                label="No-repaint rough stitch (baseline)",
+                type="filepath",
+            )
+            hard_splice_audio = gr.Audio(
+                label="Hard splice baseline (no transition)",
+                type="filepath",
+            )
             stitched_audio = gr.Audio(
                 label="Final stitched clip",
                 type="filepath",
             )
-
-        details = gr.JSON(label="Run details")
-        status = gr.Textbox(label="Status", interactive=False)
 
         run_btn.click(
             fn=_run_transition,
@@ -205,7 +216,7 @@ This app follows the coursework refinement plan through **Phase B**:
                 cue_b_sec,
                 output_dir,
             ],
-            outputs=[transition_audio, stitched_audio, details, status],
+            outputs=[transition_audio, rough_stitched_audio, hard_splice_audio, stitched_audio],
         )
 
     return demo

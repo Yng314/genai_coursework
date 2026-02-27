@@ -1,2 +1,7 @@
 # Coursework spec notebook (local reference only)
 (0) 70113_Generative_AI_README_for_Coursework.ipynb
+.vscode/settings.json
+70113_Generative_AI_README_for_Coursework.ipynb
+outputs/
+samples/
+.DS_Store

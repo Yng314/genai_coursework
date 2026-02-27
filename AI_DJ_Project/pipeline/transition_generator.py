@@ -105,6 +105,8 @@ class TransitionRequest:
 class TransitionResult:
     transition_path: str
     stitched_path: str
+    rough_stitched_path: str
+    hard_splice_path: str
     backend_used: str
     details: Dict[str, Any]
 
@@ -151,13 +153,15 @@ def _deterministic_stem(request: TransitionRequest) -> str:
     return f"transition_{_slug(Path(request.song_a_path).stem)}_to_{_slug(Path(request.song_b_path).stem)}_{digest}"
 
 
-def _resolve_output_paths(request: TransitionRequest) -> Tuple[str, str, str]:
+def _resolve_output_paths(request: TransitionRequest) -> Tuple[str, str, str, str, str]:
     os.makedirs(request.output_dir, exist_ok=True)
     stem = _deterministic_stem(request)
     transition_path = os.path.join(request.output_dir, f"{stem}_transition.wav")
     stitched_path = os.path.join(request.output_dir, f"{stem}_stitched.wav")
+    rough_stitched_path = os.path.join(request.output_dir, f"{stem}_rough_stitched.wav")
+    hard_splice_path = os.path.join(request.output_dir, f"{stem}_hard_splice.wav")
     rough_src_path = os.path.join(request.output_dir, f"{stem}_rough_src.wav")
-    return transition_path, stitched_path, rough_src_path
+    return transition_path, stitched_path, rough_stitched_path, hard_splice_path, rough_src_path
 
 
 def _resolve_acestep_project_root(request: TransitionRequest) -> str:
@@ -1437,10 +1441,18 @@ def generate_transition_artifacts(request: TransitionRequest) -> TransitionResul
     if not os.path.isfile(request.song_b_path):
         raise FileNotFoundError(f"Song B not found: {request.song_b_path}")
 
-    transition_path, stitched_path, rough_src_path = _resolve_output_paths(request)
+    transition_path, stitched_path, rough_stitched_path, hard_splice_path, rough_src_path = _resolve_output_paths(request)
 
     LOGGER.info("Transition request args: %s", json.dumps(request.to_log_dict(), sort_keys=True))
     rough = _prepare_rough_transition(request)
+    rough_stitched_audio = normalize_peak(
+        apply_edge_fades(rough["rough_stitched"].astype(np.float32), rough["target_sr"], fade_ms=25.0),
+        peak=0.98,
+    )
+    write_wav(rough_stitched_path, rough_stitched_audio, rough["target_sr"])
+    hard_splice_audio = np.concatenate([rough["song_a_prefix"], rough["song_b_suffix_substitute"]]).astype(np.float32)
+    hard_splice_audio = normalize_peak(hard_splice_audio, peak=0.98)
+    write_wav(hard_splice_path, hard_splice_audio, rough["target_sr"])
 
     transition_audio = rough["rough_seam"]
     repaint_context_audio = rough["rough_stitched"]
@@ -1543,6 +1555,8 @@ def generate_transition_artifacts(request: TransitionRequest) -> TransitionResul
         "outputs": {
             "transition_path": transition_path,
             "stitched_path": stitched_path,
+            "rough_stitched_path": rough_stitched_path,
+            "hard_splice_path": hard_splice_path,
         },
     }
     LOGGER.info("Transition result details: %s", json.dumps(details, sort_keys=True))
@@ -1550,6 +1564,8 @@ def generate_transition_artifacts(request: TransitionRequest) -> TransitionResul
     return TransitionResult(
         transition_path=transition_path,
         stitched_path=stitched_path,
+        rough_stitched_path=rough_stitched_path,
+        hard_splice_path=hard_splice_path,
         backend_used=backend_used,
         details=details,
     )
@@ -1618,4 +1634,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
