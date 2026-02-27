@@ -1,4 +1,7 @@
 import logging
+import os
+import subprocess
+from pathlib import Path
 from typing import Optional
 
 import gradio as gr
@@ -55,6 +58,44 @@ def _to_optional_float(value) -> Optional[float]:
         return float(value)
     except Exception:
         return None
+
+
+def _normalize_upload_for_ui(path: Optional[str]) -> Optional[str]:
+    if not path:
+        return path
+    src = str(path)
+    if not os.path.isfile(src):
+        return path
+
+    out_dir = os.path.join("outputs", "normalized_uploads")
+    os.makedirs(out_dir, exist_ok=True)
+    stem = Path(src).stem
+    dst = os.path.join(out_dir, f"{stem}_ui_norm.wav")
+
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-nostdin",
+        "-y",
+        "-i",
+        src,
+        "-vn",
+        "-ac",
+        "2",
+        "-ar",
+        "44100",
+        "-c:a",
+        "pcm_s16le",
+        dst,
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+        return dst
+    except Exception as exc:
+        LOGGER.warning("Upload normalization failed for %s (%s). Using original file.", src, exc)
+        return src
 
 
 def _run_transition(
@@ -160,6 +201,18 @@ def build_ui() -> gr.Blocks:
                 type="filepath",
                 sources=["upload"],
             )
+        song_a.upload(
+            fn=_normalize_upload_for_ui,
+            inputs=song_a,
+            outputs=song_a,
+            queue=False,
+        )
+        song_b.upload(
+            fn=_normalize_upload_for_ui,
+            inputs=song_b,
+            outputs=song_b,
+            queue=False,
+        )
 
         with gr.Row():
             with gr.Column():
@@ -188,16 +241,17 @@ def build_ui() -> gr.Blocks:
                     placeholder="e.g., smooth, rising energy, no vocals",
                     lines=2,
                 )
-            with gr.Column():
+
+        with gr.Accordion("Advanced controls", open=False):
+            with gr.Row():
                 transition_bars = gr.Dropdown(
                     label="Transition period length (bars)",
                     choices=[4, 8, 16],
                     value=8,
                     info="Controls transition duration. Pipeline uses fixed B-base strategy with A as reference.",
+                    min_width=320,
+                    elem_classes=["adv-item"],
                 )
-
-        with gr.Accordion("Advanced controls", open=False):
-            with gr.Row():
                 pre_context_sec = gr.Slider(
                     minimum=1,
                     maximum=12,
