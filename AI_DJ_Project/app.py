@@ -96,8 +96,8 @@ def _run_transition(
 
     return (
         result.transition_path,
-        result.rough_stitched_path,
         result.hard_splice_path,
+        result.rough_stitched_path,
         result.stitched_path,
     )
 
@@ -106,13 +106,36 @@ def build_ui() -> gr.Blocks:
     with gr.Blocks(theme=APP_THEME, css=APP_CSS) as demo:
         gr.Markdown(
             """
-# AI DJ Transition Generator (Phase A/B)
-
-This app follows the coursework refinement plan through **Phase B**:
-- deterministic transition API (two songs in -> transition + stitched artifacts out)
-- ACE-Step repaint seam generation with bar-defined transition periods
+<div style="text-align:center;">
+  <h1>AI DJ Transition Generator</h1>
+  <p>Upload two songs and generate a transition between them.</p>
+</div>
             """.strip()
         )
+        with gr.Row():
+            gr.Markdown(
+                """
+### How to use
+1. Upload **Song A** (current track) and **Song B** (next track).
+2. Choose a **Transition style plugin**.
+3. Optionally add **Text instruction** (e.g., smooth, rising energy, no vocals).
+4. Select **Transition period length (bars)**.
+5. Click **Generate transition artifacts**.
+                """.strip(),
+                container=False,
+                elem_classes=["plain-info"],
+            )
+            gr.Markdown(
+                """
+### Outputs
+- **Generated transition clip**: AI-generated repaint transition segment.
+- **Hard splice baseline (no transition)**: direct cut baseline.
+- **No-repaint rough stitch (baseline)**: stitched baseline without repaint.
+- **Final stitched clip**: final result with transition inserted.
+                """.strip(),
+                container=False,
+                elem_classes=["plain-info"],
+            )
 
         with gr.Row():
             song_a = gr.Audio(
@@ -240,12 +263,12 @@ This app follows the coursework refinement plan through **Phase B**:
                 label="Generated transition clip",
                 type="filepath",
             )
-            rough_stitched_audio = gr.Audio(
-                label="No-repaint rough stitch (baseline)",
-                type="filepath",
-            )
             hard_splice_audio = gr.Audio(
                 label="Hard splice baseline (no transition)",
+                type="filepath",
+            )
+            rough_stitched_audio = gr.Audio(
+                label="No-repaint rough stitch (baseline)",
                 type="filepath",
             )
             stitched_audio = gr.Audio(
@@ -272,7 +295,7 @@ This app follows the coursework refinement plan through **Phase B**:
                 cue_b_sec,
                 output_dir,
             ],
-            outputs=[transition_audio, rough_stitched_audio, hard_splice_audio, stitched_audio],
+            outputs=[transition_audio, hard_splice_audio, rough_stitched_audio, stitched_audio],
         )
 
     return demo
