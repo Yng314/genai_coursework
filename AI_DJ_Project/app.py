@@ -15,6 +15,28 @@ logging.basicConfig(
 )
 LOGGER = logging.getLogger(__name__)
 
+APP_CSS = """
+.adv-item label,
+.adv-item .gr-block-label,
+.adv-item .gr-block-title {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+"""
+
+APP_THEME = gr.themes.Soft(
+    primary_hue="blue",
+    neutral_hue="slate",
+    radius_size="lg",
+).set(
+    block_radius="*radius_xl",
+    input_radius="*radius_xl",
+    button_large_radius="*radius_xl",
+    button_medium_radius="*radius_xl",
+    button_small_radius="*radius_xl",
+)
+
 
 def _to_optional_float(value) -> Optional[float]:
     if value is None:
@@ -81,7 +103,7 @@ def _run_transition(
 
 
 def build_ui() -> gr.Blocks:
-    with gr.Blocks() as demo:
+    with gr.Blocks(theme=APP_THEME, css=APP_CSS) as demo:
         gr.Markdown(
             """
 # AI DJ Transition Generator (Phase A/B)
@@ -130,6 +152,8 @@ This app follows the coursework refinement plan through **Phase B**:
                     value=6,
                     step=0.5,
                     label="Seconds before seam (Song A context)",
+                    min_width=320,
+                    elem_classes=["adv-item"],
                 )
                 post_context_sec = gr.Slider(
                     minimum=1,
@@ -137,23 +161,36 @@ This app follows the coursework refinement plan through **Phase B**:
                     value=6,
                     step=0.5,
                     label="Seconds after seam (Song B context)",
+                    min_width=320,
+                    elem_classes=["adv-item"],
                 )
+
+            with gr.Row():
                 analysis_sec = gr.Slider(
                     minimum=10,
                     maximum=90,
                     value=45,
                     step=5,
                     label="Analysis window (seconds)",
+                    min_width=320,
+                    elem_classes=["adv-item"],
+                )
+                bpm_target = gr.Number(
+                    label="Optional BPM target override",
+                    value=None,
+                    min_width=320,
+                    elem_classes=["adv-item"],
                 )
 
             with gr.Row():
-                bpm_target = gr.Number(label="Optional BPM target override", value=None)
                 creativity_strength = gr.Slider(
                     minimum=1.0,
                     maximum=12.0,
                     value=7.0,
                     step=0.5,
                     label="Creativity strength (guidance)",
+                    min_width=320,
+                    elem_classes=["adv-item"],
                 )
                 inference_steps = gr.Slider(
                     minimum=1,
@@ -161,21 +198,40 @@ This app follows the coursework refinement plan through **Phase B**:
                     value=8,
                     step=1,
                     label="ACE-Step inference steps",
+                    min_width=320,
+                    elem_classes=["adv-item"],
                 )
-                seed = gr.Number(label="Seed", value=42, precision=0)
 
             with gr.Row():
+                seed = gr.Number(
+                    label="Seed",
+                    value=42,
+                    precision=0,
+                    min_width=320,
+                    elem_classes=["adv-item"],
+                )
                 cue_a_sec = gr.Textbox(
                     label="Optional cue A override (sec)",
                     value="",
                     placeholder="Leave blank for auto cue selection",
+                    min_width=320,
+                    elem_classes=["adv-item"],
                 )
+
+            with gr.Row():
                 cue_b_sec = gr.Textbox(
                     label="Optional cue B override (sec)",
                     value="",
                     placeholder="Leave blank for auto cue selection",
+                    min_width=320,
+                    elem_classes=["adv-item"],
                 )
-                output_dir = gr.Textbox(label="Output directory", value="outputs")
+                output_dir = gr.Textbox(
+                    label="Output directory",
+                    value="outputs",
+                    min_width=320,
+                    elem_classes=["adv-item"],
+                )
 
         run_btn = gr.Button("Generate transition artifacts", variant="primary")
 
